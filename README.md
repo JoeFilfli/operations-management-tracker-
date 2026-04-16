@@ -1,8 +1,5 @@
 # OpsTrack
 
-<!-- Replace YOUR_USER/YOUR_REPO before pushing -->
-![CI](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/ci.yml/badge.svg)
-
 Equipment & operations management platform. Tracks inventory, equipment status, and maintenance tickets across a technical organization. Web dashboard for admins, React Native app for field staff.
 
 ## Repo layout
