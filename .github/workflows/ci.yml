@@ -103,46 +103,7 @@ jobs:
           # Placeholder so Vite doesn't warn; the real value is set at deploy time
           VITE_API_BASE_URL: http://localhost:5000
 
-  # ── Deploy to Railway (push to main only) ─────────────────────────────────
-  #
-  # Railway can auto-deploy directly from GitHub. These jobs are for teams
-  # that want CI to gate every deploy:
-  #   1. In the Railway dashboard, disable auto-deploy for each service.
-  #   2. Add RAILWAY_TOKEN (project token) to your GitHub repo secrets.
-  #   3. The jobs below will only fire after lint + tests pass.
-  #
-  deploy-backend:
-    name: Deploy backend → Railway
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend-lint, backend-test, web-build]
-    runs-on: ubuntu-latest
-    environment: production
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy backend service
-        run: railway up --service backend --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-
-  deploy-web:
-    name: Deploy web → Railway
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    needs: [backend-lint, backend-test, web-build]
-    runs-on: ubuntu-latest
-    environment: production
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy web service
-        run: railway up --service web --detach
-        env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+  # ── Deploy to Railway ─────────────────────────────────────────────────────
+  # Railway deploys automatically via "Wait for CI" (enabled in the Railway
+  # dashboard). No explicit deploy step needed here — Railway watches this
+  # workflow and deploys only after all jobs above pass.
