@@ -18,8 +18,10 @@ RUN npm run build
 FROM nginx:1.27-alpine
 
 COPY --from=builder /app/dist /usr/share/nginx/html
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Store as template; envsubst fills in $PORT at container startup
+COPY nginx.conf /etc/nginx/conf.d/default.conf.template
 
 EXPOSE 80
 
-CMD ["nginx", "-g", "daemon off;"]
+# Railway injects $PORT; substitute it into the config then start nginx
+CMD ["/bin/sh", "-c", "envsubst '${PORT}' < /etc/nginx/conf.d/default.conf.template > /etc/nginx/conf.d/default.conf && nginx -g 'daemon off;'"]
