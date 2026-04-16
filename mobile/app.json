@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "OpsTrack",
+    "slug": "opstrack",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.opstrack.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#2d5cd4"
+      },
+      "package": "com.opstrack.app"
+    },
+    "extra": {
+      "apiBaseUrl": "http://localhost:5000"
+    },
+    "plugins": [
+      "expo-asset"
+    ]
+  }
+}

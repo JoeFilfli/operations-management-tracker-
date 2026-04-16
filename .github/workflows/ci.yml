@@ -1,0 +1,148 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ── Backend: lint ──────────────────────────────────────────────────────────
+  backend-lint:
+    name: Backend lint (ruff)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: ruff check
+        run: ruff check app tests
+
+  # ── Backend: test ──────────────────────────────────────────────────────────
+  backend-test:
+    name: Backend tests (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: opstrack
+          POSTGRES_PASSWORD: opstrack
+          POSTGRES_DB: opstrack_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opstrack"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://opstrack:opstrack@localhost:5432/opstrack_test
+      SECRET_KEY: ci-secret-key
+      JWT_SECRET_KEY: ci-jwt-secret-key
+      FLASK_ENV: testing
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run pytest
+        run: pytest --tb=short
+
+  # ── Web: lint + build ──────────────────────────────────────────────────────
+  web-build:
+    name: Web lint + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: ESLint
+        run: npm run lint
+
+      - name: Vite build (smoke test)
+        run: npm run build
+        env:
+          # Placeholder so Vite doesn't warn; the real value is set at deploy time
+          VITE_API_BASE_URL: http://localhost:5000
+
+  # ── Deploy to Railway (push to main only) ─────────────────────────────────
+  #
+  # Railway can auto-deploy directly from GitHub. These jobs are for teams
+  # that want CI to gate every deploy:
+  #   1. In the Railway dashboard, disable auto-deploy for each service.
+  #   2. Add RAILWAY_TOKEN (project token) to your GitHub repo secrets.
+  #   3. The jobs below will only fire after lint + tests pass.
+  #
+  deploy-backend:
+    name: Deploy backend → Railway
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [backend-lint, backend-test, web-build]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy backend service
+        run: railway up --service backend --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+  deploy-web:
+    name: Deploy web → Railway
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: [backend-lint, backend-test, web-build]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy web service
+        run: railway up --service web --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

@@ -1,0 +1,79 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: opstrack-db
+    environment:
+      POSTGRES_USER: opstrack
+      POSTGRES_PASSWORD: opstrack
+      POSTGRES_DB: opstrack
+    ports:
+      - "5433:5432"
+    volumes:
+      - opstrack-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opstrack -d opstrack"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+      args:
+        INSTALL_DEV: "1"
+    container_name: opstrack-backend
+    environment:
+      FLASK_APP: wsgi:app
+      FLASK_ENV: development
+      FLASK_DEBUG: "1"
+      SECRET_KEY: dev-secret-change-me
+      JWT_SECRET_KEY: dev-jwt-secret-change-me
+      JWT_ACCESS_TOKEN_EXPIRES_MINUTES: "60"
+      JWT_REFRESH_TOKEN_EXPIRES_DAYS: "30"
+      DATABASE_URL: postgresql+psycopg2://opstrack:opstrack@db:5432/opstrack
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8081,http://10.169.46.12:8081
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ../backend/app:/app/app
+      - ../backend/migrations:/app/migrations
+      - ../backend/tests:/app/tests
+      - ../backend/wsgi.py:/app/wsgi.py
+      - ../backend/pyproject.toml:/app/pyproject.toml
+    command: ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+
+  web:
+    image: node:24-alpine
+    container_name: opstrack-web
+    working_dir: /app
+    volumes:
+      - ../web:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:5000
+    depends_on:
+      - backend
+    command: sh -c "npm install --prefer-offline && npm run dev -- --host"
+
+  pgadmin:
+    image: dpage/pgadmin4:8
+    container_name: opstrack-pgadmin
+    profiles: ["admin"]
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@opstrack.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    ports:
+      - "5050:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  opstrack-pgdata:
